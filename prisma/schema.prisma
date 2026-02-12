@@ -1,0 +1,355 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User & Auth
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  phone     String?  @unique
+  username  String?  @unique
+  password  String?  // Hashed
+  role      String   @default("user") // "user", "admin", "super_admin"
+  permissions String? // JSON string for admin permissions
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  addresses Address[]
+  reviews   Review[]
+  tickets   Ticket[]
+  wishlist  WishlistItem[]
+}
+
+// Product Management
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String?  @unique
+  description      String?
+  shortDescription String?
+  basePrice        Float
+  discountPrice    Float?
+  stock            Int      @default(0)
+  image            String?
+  images           String?  // JSON string of string[]
+  published        Boolean  @default(true)
+  isTrending       Boolean  @default(false)
+  
+  // Relations
+  categoryName     String? 
+  category         Category? @relation(fields: [categoryId], references: [id])
+  categoryId       String?
+
+  brandName        String?
+  brand            Brand? @relation(fields: [brandId], references: [id])
+  brandId          String?
+
+  // Options & Variants
+  options          String? // JSON: ProductOption[]
+  variants         ProductVariant[]
+
+  // SEO
+  seoTitle         String?
+  seoDescription   String?
+  seoKeywords      String? // JSON: string[]
+  imageAlt         String?
+
+  // Physical Specs
+  weight           Float?
+  length           Float?
+  width            Float?
+  height           Float?
+  volume           Float?
+  
+  // Relations
+  reviews          Review[]
+  orderItems       OrderItem[]
+  wishlistedBy     WishlistItem[]
+  
+  specialSaleEndTime DateTime?
+  sku              String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  price     Float
+  stock     Int
+  selection String // JSON: VariantSelection
+  image     String?
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  image       String?
+  isActive    Boolean  @default(true)
+  isPopular   Boolean  @default(false)
+  
+  parentId    String?
+  parent      Category? @relation("CategoryParent", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryParent")
+  
+  products    Product[]
+}
+
+model Brand {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  description String?
+  isActive    Boolean  @default(true)
+  products    Product[]
+}
+
+// Order Management
+model Order {
+  id              String   @id @default(cuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  
+  total           Float
+  discount        Float?
+  status          String   @default("processing") // processing, shipped, delivered, cancelled
+  paymentMethod   String?
+  shippingMethod  String?
+  trackingNumber  String?
+  estimatedDelivery DateTime?
+  note            String?
+  
+  items           OrderItem[]
+  address         Address? @relation(fields: [addressId], references: [id])
+  addressId       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isViewed        Boolean  @default(false)
+  
+  returns         ReturnRequest[]
+}
+
+model ReturnRequest {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  reason      String
+  status      String   @default("requested") // requested, approved, rejected, refunded
+  refundAmount Float?
+  note        String?
+  
+  items       String   // JSON: ReturnItem[]
+  
+  requestedAt DateTime @default(now())
+  decisionAt  DateTime?
+  updatedAt   DateTime @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  
+  name      String
+  price     Float
+  quantity  Int
+  variantId String?
+  // Store snapshot of product details in case product is deleted
+  image     String?
+  color     String?
+  size      String?
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  fullName    String
+  phone       String
+  province    String?
+  city        String
+  addressLine String
+  postalCode  String?
+  
+  orders      Order[]
+}
+
+model WishlistItem {
+  id        String  @id @default(cuid())
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// Content & Support
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  author    String
+  rating    Int
+  content   String
+  status    String   @default("pending") // approved, pending, rejected
+  
+  // Detailed ratings
+  ratingQuality   Int?
+  ratingValue     Int?
+  ratingPackaging Int?
+  
+  reply     String?
+  replyAt   DateTime?
+  
+  helpfulUp   Int @default(0)
+  helpfulDown Int @default(0)
+  
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  subject   String
+  category  String? // pre-sale, technical, etc.
+  status    String   @default("open")
+  priority  String   @default("medium")
+  
+  messages  TicketMessage[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  sender    String // "user" or "admin"
+  content   String
+  attachment String?
+  isInternal Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String?
+  author      String?
+  category    String?
+  image       String?
+  published   Boolean  @default(true)
+  
+  seoTitle    String?
+  seoDescription String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  relatedProductIds String? // JSON: string[]
+}
+
+model Banner {
+  id              String   @id @default(cuid())
+  title           String
+  subtitle        String?
+  image           String?
+  link            String?
+  active          Boolean  @default(true)
+  order           Int      @default(0)
+  position        String   @default("hero")
+  backgroundColor String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model InventoryLog {
+  id          String   @id @default(cuid())
+  productId   String
+  productName String
+  adminName   String
+  changeType  String
+  oldStock    Int
+  newStock    Int
+  createdAt   DateTime @default(now())
+}
+
+model Coupon {
+  id                 String    @id @default(cuid())
+  code               String    @unique
+  type               String // "percent" or "fixed"
+  value              Float
+  active             Boolean   @default(true)
+  startDate          DateTime?
+  endDate            DateTime?
+  maxUses            Int?
+  usedCount          Int       @default(0)
+  minOrderAmount     Float?    @default(0)
+  maxUsesPerUser     Int?
+  allowedProductIds  String? // JSON string of String[]
+  allowedCategoryIds String? // JSON string of String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+}
+
+// Live Chat
+model ChatSession {
+  id                String       @id
+  userName          String
+  customerName      String?
+  customerPhone     String?
+  customerSubject   String?
+  lastMessageTimestamp Int       @default(0)
+  unreadCount       Int          @default(0)
+  messages          ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender    String   // 'user' | 'admin'
+  text      String
+  timestamp Int
+  read      Boolean  @default(false)
+}

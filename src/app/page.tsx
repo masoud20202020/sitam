@@ -1,65 +1,74 @@
-import Image from "next/image";
+import { Header } from '@/components/Header';
+import { Hero } from '@/components/Hero';
+import { PopularCategories } from '@/components/PopularCategories';
+import { TrendingProducts } from '@/components/TrendingProducts';
+import { MiddleBanner } from '@/components/MiddleBanner';
+import { TrustFeatures } from '@/components/TrustFeatures';
+import { BottomBanners } from '@/components/BottomBanners';
+import dynamic from 'next/dynamic';
+import { Footer } from '@/components/Footer';
+import { LatestPosts } from '@/components/LatestPosts';
+import { TopBrands } from '@/components/TopBrands';
+import { SmartRecommendations } from '@/components/SmartRecommendations';
+import { PromoBanners } from '@/components/PromoBanners';
+import { FeaturedProducts } from '@/components/FeaturedProducts';
+import { getProductsAction } from '@/actions/products';
+import { getCategoriesAction } from '@/actions/categories';
+import { getBrandsAction } from '@/actions/brands';
+import { getLatestBlogPostsAction } from '@/actions/blog';
+import { getBannersAction } from '@/actions/banners';
+import type { Brand } from '@/data/brands';
 
-export default function Home() {
+const ProductList = dynamic(() => import('@/components/ProductList').then(m => m.ProductList), {
+  ssr: true,
+});
+
+export default async function Home() {
+  const [products, categories, brandsRes, posts, bannersRes] = await Promise.all([
+    getProductsAction(),
+    getCategoriesAction(),
+    getBrandsAction(),
+    getLatestBlogPostsAction(4),
+    getBannersAction()
+  ]);
+  const banners = bannersRes.success && bannersRes.data ? bannersRes.data : [];
+  const brands = brandsRes.success && brandsRes.data ? (brandsRes.data as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    logo: string | null;
+    description?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    isActive?: boolean | null;
+  }>) : [];
+  const brandsMapped: Brand[] = brands.map((b) => ({
+    id: String(b.id),
+    name: b.name || '',
+    slug: b.slug || String(b.id),
+    logo: b.logo || undefined,
+    description: b.description || undefined,
+    seoTitle: b.seoTitle || undefined,
+    seoDescription: b.seoDescription || undefined,
+    isActive: b.isActive === null || b.isActive === undefined ? true : !!b.isActive,
+  }));
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
+      <Header />
+      <Hero initialBanners={banners} />
+      <ProductList limit={8} title="آخرین محصولات" sort="latest" showViewAll={true} variant="boxed" initialProducts={products} />
+      <PromoBanners initialBanners={banners} />
+      <PopularCategories initialCategories={categories} />
+      <SmartRecommendations initialProducts={products} />
+      <MiddleBanner initialBanners={banners} />
+      <FeaturedProducts initialProducts={products} />
+      <BottomBanners initialBanners={banners} />
+      <TopBrands initialBrands={brandsMapped} />
+      <TrendingProducts initialProducts={products} />
+      <LatestPosts initialPosts={posts} />
+      <TrustFeatures />
+      <Footer />
+    </main>
   );
 }
